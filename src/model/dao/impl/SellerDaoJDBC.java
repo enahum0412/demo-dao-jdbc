@@ -4,7 +4,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import db.DB;
 import db.DbException;
@@ -87,5 +90,50 @@ public class SellerDaoJDBC implements SellerDao {
 	public List<Seller> findAll() {
 		// TODO Auto-generated method stub
 		return null;
+	}
+
+	@Override
+	public List<Seller> findByDepartment(Department department) {
+		PreparedStatement st = null;
+		ResultSet rs = null;
+		try {
+			st = conn.prepareStatement(
+					"SELECT seller.*, department.Name as DepName "
+					+ "FROM seller INNER JOIN department "
+					+ "ON seller.DepartmentId = department.Id "
+					+ "WHERE DepartmentId = ? "
+					+ "ORDER BY Name");
+			st.setInt(1, department.getId());
+			rs = st.executeQuery();
+			
+			List<Seller> list = new ArrayList<>();
+			
+			//Para evitar a instanciacao do mesmo departamento varias vezes, fazem a seguinte solucao:
+			// 1) Crio um Map vazio e guardo dentro dele qualquer departamento que eu instanciar;
+			// 2) A cada passagem pelo while, testamos se o departamento ja existe indo no map e tentando buscar um departamento com o id (map.getInt("Department"), que retornara nulo caso nao haja;
+			// Se for nulo, havera a instanciacao
+			Map<Integer, Department> map = new HashMap<>();
+			
+			while (rs.next()) {
+				//Teste para saber se o departamento ja existe
+				Department dep = map.get(rs.getInt("DepartmentId"));
+				
+				if (dep == null ) {
+					dep = instantiateDepartment(rs);
+					map.put(rs.getInt("DepartmentId"), dep);
+				}
+				
+				Seller obj = instantiateSeller(rs, dep);
+				list.add(obj);
+			}
+			return list;
+		}
+		catch (SQLException e) {
+			throw new DbException(e.getMessage());
+		}
+		finally {
+			DB.closeStatement(st);
+			DB.closeResultSet(rs);	
+		}
 	}
 }
